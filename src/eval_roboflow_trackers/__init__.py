@@ -1,2 +1,2 @@
 def main() -> None:
-    print("Hello from eval-roboflow-trackers!")
+    print('Hello from eval-roboflow-trackers!')

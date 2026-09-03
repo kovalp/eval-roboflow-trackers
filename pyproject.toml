@@ -8,12 +8,24 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "association-quality-clavia>=0.3.2",
+    "binary-classification-ratios>=0.3.0",
+    "rich-argparse>=1.8.0",
+    "supervision>=0.30.1",
     "trackers>=2.6.0",
 ]
 
 [project.scripts]
-eval-roboflow-trackers = "eval_roboflow_trackers:main"
+eval-bytetrack-clavia = "eval_roboflow_trackers.cli.clavia.main:main"
+eval-bytetrack-clear-detections = "eval_roboflow_trackers.cli.clear.det.main:main"
+eval-bytetrack-clear-gt = "eval_roboflow_trackers.cli.clear.gt.main:main"
 
 [build-system]
 requires = ["uv_build>=0.12.9,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.5",
+    "ty>=0.0.78",
+]
