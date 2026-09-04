@@ -1,8 +1,9 @@
 from typing import Sequence
 
 import numpy as np
+
 from association_quality_clavia import AssociationQuality
-from supervision import LabelAnnotator, BoxAnnotator, Detections, Position
+from supervision import BoxAnnotator, Detections, LabelAnnotator, Position
 
 from eval_roboflow_trackers.bytetrack.tracklet_ia import ByteTrackTrackletIa
 
@@ -14,11 +15,9 @@ class ClavIaAnnotator:
         self.label_ann_upd = LabelAnnotator(text_position=Position.TOP_RIGHT)
         self.box_ann = BoxAnnotator()
 
-    def annotate(self,
-                 image: np.ndarray,
-                 tracks: list[ByteTrackTrackletIa],
-                 detection_id: Sequence[int]
-                 ) -> int:
+    def annotate(
+        self, image: np.ndarray, tracks: list[ByteTrackTrackletIa], detection_id: Sequence[int]
+    ) -> int:
         aq = AssociationQuality()
 
         boxes = []
@@ -41,4 +40,3 @@ class ClavIaAnnotator:
             self.label_ann_upd.annotate(image, detections, labels=upd_id)
 
         return len(boxes)
-
