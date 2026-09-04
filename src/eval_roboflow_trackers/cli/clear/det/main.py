@@ -3,49 +3,44 @@ from typing import Sequence
 
 from binary_classification_ratios import BinaryClassificationRatios
 from trackers import ByteTrackTracker, load_mot_file
-from trackers.eval import CLEARMetrics, compute_clear_metrics
-from trackers.io.mot import _mot_frame_to_detections, _MOTOutput, _prepare_mot_sequence
+from trackers.eval import compute_clear_metrics, compute_hota_metrics
+from trackers.io.mot import _prepare_mot_sequence
+
+from eval_roboflow_trackers.cli.clear.f1_scores import get_f1_clear, get_f1_hota
+from eval_roboflow_trackers.cli.clear.keeper import Keeper
+from eval_roboflow_trackers.cli.clear.track_write_load import track_write_load
 
 from .cli import get_cmd_line
 
 
 def run(args: Sequence[str] | None = None) -> int:
     cli = get_cmd_line(args)
-    threshold = 0.5
     det_paths = sorted(Path.cwd().rglob(cli.glob_det))
     gt_paths = sorted(Path.cwd().rglob(cli.glob_gt))
-    global_tp, global_fn, global_fp = 0, 0, 0
+    global_cm_clear = Keeper()
+    global_cm_hota = Keeper()
     for path_idx, det_path in enumerate(det_paths):
-        mot_frame_data = load_mot_file(det_path)
         tracker = ByteTrackTracker()
-        with _MOTOutput(Path('tmp-dir-track-eval/tracks.txt')) as mot:
-            for frame_idx in sorted(mot_frame_data):
-                detections_data = mot_frame_data[frame_idx]
-                detections = _mot_frame_to_detections(detections_data)
-                tracked = tracker.update(detections)
-                mot.write(frame_idx, tracked)
+        tracker_data = track_write_load(tracker, load_mot_file(det_path))
 
         gt_data = load_mot_file(gt_paths[path_idx])
-        tracker_data = load_mot_file('tmp-dir-track-eval/tracks.txt')
+        sd = _prepare_mot_sequence(
+            gt_data, tracker_data
+        )  # Prepare sequence (compute IoU, remap IDs)
 
-        # Prepare sequence (compute IoU, remap IDs)
-        seq_data = _prepare_mot_sequence(gt_data, tracker_data)
-        clear_metrics_dict = compute_clear_metrics(
-            seq_data.gt_ids, seq_data.tracker_ids, seq_data.similarity_scores, threshold=threshold
-        )
-        clear = CLEARMetrics.from_dict(clear_metrics_dict)
-        global_tp += clear.CLR_TP
-        global_fn += clear.CLR_FN
-        global_fp += clear.CLR_FP
+        clear_dict = compute_clear_metrics(sd.gt_ids, sd.tracker_ids, sd.similarity_scores)
+        hota_dict = compute_hota_metrics(sd.gt_ids, sd.tracker_ids, sd.similarity_scores)
+
+        global_cm_clear.add_clear(**clear_dict)
+        global_cm_hota.add_hota(**hota_dict)
         if cli.verbosity > 0:
-            print(det_path)
-            bcr_local = BinaryClassificationRatios(
-                tp=clear.CLR_TP, fn=clear.CLR_FN, fp=clear.CLR_FP, tn=0
-            )
-            print(bcr_local.get_summary())
+            print(det_path, get_f1_clear(clear_dict), get_f1_hota(hota_dict))
 
-    bcr_global = BinaryClassificationRatios(tp=global_tp, fn=global_fn, fp=global_fp, tn=0)
-    print(bcr_global.get_summary())
+    bcr_global_clear = BinaryClassificationRatios(**vars(global_cm_clear))
+    print(bcr_global_clear.get_summary())
+
+    bcr_global_hota = BinaryClassificationRatios(**vars(global_cm_hota))
+    print(bcr_global_hota.get_summary())
 
     return 0
 
